@@ -21,7 +21,6 @@ function updateClock(mod) {
             minutes = now.getMinutes().toString().padStart(2, '0');
             seconds = now.getSeconds().toString().padStart(2, '0');
             timeEl.innerHTML = `${hours}:${minutes}:${seconds}`
-            console.log(seconds);
         }, 1000);
     }
 }
@@ -72,7 +71,7 @@ function updateWeather() {
     }, 30000);
 
     function getAPI() {
-        console.log("Get API...");
+        console.log("Fetching weather from the API...");
     	fetch(apiUrl)
     		.then(response => {
     			if (!response.ok) {
@@ -90,8 +89,6 @@ function updateWeather() {
     					tempElement.innerHTML = `${temp}°`;
     					localStorage.setItem("wxTemp", temp);
     					localStorage.setItem("wxTime", Date.now());
-    				} else {
-    					console.error("Temperature element not found");
     				}
     			} else {
     				throw new Error('Missing temperature data');
