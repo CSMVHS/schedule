@@ -77,122 +77,120 @@ body > div.bar {
     flex-direction: row;
     align-items: center;
     justify-content: center;
+}
 
-    > div {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        padding: 1.5vh;
+body > div.bar > div {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 1.5vh;
+}
 
-        p {
-            color: white;
-            font-size: 10vh;
-            font-family: 'Azeret Mono', monospace;
-            font-weight: 450;
-        }
-    }
+body > div.bar > div p {
+    color: white;
+    font-size: 10vh;
+    font-family: 'Azeret Mono', monospace;
+    font-weight: 450;
+}
 
-    div.date {
-        width: 25%;
-        align-items: flex-start;
-    }
+body > div.bar div.date {
+    width: 25%;
+    align-items: flex-start;
+}
 
-    div.clock {
-        width: 50%;
-        align-items: center;
-    }
+body > div.bar div.clock {
+    width: 50%;
+    align-items: center;
+}
 
-    div.weather {
-        width: 25%;
-        align-items: flex-end;
-    }
+body > div.bar div.weather {
+    width: 25%;
+    align-items: flex-end;
 }
 
 div.site {
     min-height: calc(100vh - 13vh - 32px);
     max-height: calc(100vh - 13vh - 32px);
     overflow: hidden;
+}
 
-    div.bars {
-        height: calc(100vh - 13vh - 32px);
-        width: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
+div.site div.bars {
+    height: calc(100vh - 13vh - 32px);
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
 
-        div.bar {
-            height: calc(((100vh - 13vh - 32px) / 2) - 10px);
-            width: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            position: relative;
-            border-top: 4px solid rgba(0, 0, 0, 0.8);
-            border-bottom: 4px solid rgba(0, 0, 0, 0.8);
+div.site div.bars div.bar {
+    height: calc(((100vh - 13vh - 32px) / 2) - 10px);
+    width: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    position: relative;
+    border-top: 4px solid rgba(0, 0, 0, 0.8);
+    border-bottom: 4px solid rgba(0, 0, 0, 0.8);
+}
 
-            div.progress {
-                height: 100%;
-                width: 50%;
-                background-position: 0 100%;
-                animation-fill-mode: forwards;
-                transition: 1s linear;
-            }
+div.site div.bars div.bar div.progress {
+    height: 100%;
+    width: 50%;
+    background-position: 0 100%;
+    animation-fill-mode: forwards;
+    transition: 1s linear;
+}
 
-            div.name-container {
-                position: absolute;
-                top: 0;
-                left: 0;
-                height: 100%;
-                width: 30%;
-                display: flex;
-                flex-direction: column;
-                align-items: flex-start;
-                padding: 30px;
-                justify-content: center;
+div.site div.bars div.bar div.name-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 30%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 30px;
+    justify-content: center;
+}
 
-                p {
-                    color: white;
-                    font-size: 5vw;
-                }
-            }
+div.site div.bars div.bar div.name-container p {
+    color: white;
+    font-size: 5vw;
+}
 
-            div.remaining-container {
-                position: absolute;
-                top: 0;
-                right: 0;
-                height: 100%;
-                width: 70%;
-                display: flex;
-                flex-direction: column;
-                align-items: flex-end;
-                padding: 30px;
-                justify-content: center;
+div.site div.bars div.bar div.remaining-container {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 70%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    padding: 30px;
+    justify-content: center;
+}
 
-                p {
-                    color: white;
-                    font-weight: bold;
-                    font-size: 9vw;
-                }
-            }
-        }
+div.site div.bars div.bar div.remaining-container p {
+    color: white;
+    font-weight: bold;
+    font-size: 9vw;
+}
 
-        div.bar.bar1 {
-            margin: 10px 0px 10px 0px;
+div.site div.bars div.bar.bar1 {
+    margin: 10px 0px 10px 0px;
+}
 
-            div.progress {
-                background-image: repeating-linear-gradient(to right, var(--css-color-1), var(--css-color-2), var(--css-color-1));
-                background-size: 200% 100%;
-                animation: pushingGradient 20s linear infinite;
-            }
-        }
+div.site div.bars div.bar.bar1 div.progress {
+    background-image: repeating-linear-gradient(to right, var(--css-color-1), var(--css-color-2), var(--css-color-1));
+    background-size: 200% 100%;
+    animation: pushingGradient 20s linear infinite;
+}
 
-        div.bar.bar2 {
-            div.progress {
-                background-image: repeating-linear-gradient(to right, var(--css-color-1), var(--css-color-2), var(--css-color-1));
-                background-size: 200% 100%;
-                animation: pushingGradient 20s linear infinite;
-            }
-        }
-    }
+div.site div.bars div.bar.bar2 div.progress {
+    background-image: repeating-linear-gradient(to right, var(--css-color-1), var(--css-color-2), var(--css-color-1));
+    background-size: 200% 100%;
+    animation: pushingGradient 20s linear infinite;
 }
 
 @keyframes pushingGradient {
