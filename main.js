@@ -489,3 +489,18 @@ function debugSchedule() {
     console.log('Current Schedule Information:', info);
     return info;
 }
+
+async function handleCommands() {
+    const devLink = "https://script.google.com/macros/s/AKfycbxZe6A-GKnGcv9efNxrMeSNvxcYC2MhOvqQkQLNpIiQOqcJCSuCTauq0k7Pwuz4OIcf/exec";
+
+    const response = await fetch(devLink); 
+    const command = await response.text();
+
+    if (command == "refresh") {
+        location.reload();
+    } else if (command == "wipe-storage") {
+        localStorage.clear();
+    }
+}
+
+handleCommands();
