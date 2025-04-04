@@ -579,3 +579,20 @@ function init() {
 
 // --- Start Everything ---
 document.addEventListener('DOMContentLoaded', init);
+
+function refreshAtSpecificTimes() {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+
+    // Set the refresh times (6 AM and 7 AM)
+    const refreshTimes = [6, 7];
+
+    // Check if the current time matches 6 AM or 7 AM
+    if (refreshTimes.includes(hours) && minutes === 0) {
+        location.reload();
+    }
+}
+
+// Check the time every minute
+setInterval(refreshAtSpecificTimes, 60000);
