@@ -28,63 +28,61 @@ function cacheElements() {
     elements.bar2Progress = elements.bar2.querySelector('.progress');
 }
 
-// Store the timeout ID so we can potentially cancel it if needed (though not strictly necessary here)
+// Store the timeout ID
 let clockTimeoutId = null;
 
 // Clock functionality - using self-adjusting setTimeout for accuracy
 function setupClock() {
-    // --- Remove the old setInterval logic ---
-    // No initial sync setTimeout needed, the loop handles it.
-    // No setInterval used anymore.
-
     // Start the clock loop
     runClockCycle();
 }
 
 function runClockCycle() {
-    // 1. Update the display with the current time
-    updateTimeDisplay(); // Renamed the core display logic
+    // 1. Update the display with the current time AND schedule info
+    updateTimeAndScheduleDisplay(); // Combined update function
 
     // 2. Calculate the delay until the next whole second
     const now = new Date();
-    const delayUntilNextSecond = 1000 - now.getMilliseconds();
+    // Ensure a minimum delay to prevent potential tight loops if calculation is off
+    const delayUntilNextSecond = Math.max(50, 1000 - now.getMilliseconds());
 
     // 3. Schedule the next cycle
-    // Use setTimeout to run this function again after the calculated delay
     clockTimeoutId = setTimeout(runClockCycle, delayUntilNextSecond);
 }
 
-// Renamed function to focus purely on updating the DOM element for time
-function updateTimeDisplay() {
+// Combined function to update time display and schedule display every second
+function updateTimeAndScheduleDisplay() {
     const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const hours = now.getHours(); // Get hours for refresh check too
+    const minutes = now.getMinutes(); // Get minutes for refresh check
+    const seconds = now.getSeconds();
+
+    const hoursStr = hours.toString().padStart(2, '0');
+    const minutesStr = minutes.toString().padStart(2, '0');
+    const secondsStr = seconds.toString().padStart(2, '0');
 
     // Update clock display
-    elements.timeEl.textContent = `${hours}:${minutes}:${seconds}`;
+    elements.timeEl.textContent = `${hoursStr}:${minutesStr}:${secondsStr}`;
 
-    // OPTIMIZATION: Update schedule display only once per minute (when seconds are 00)
-    // This check remains the same, but it's now within the accurately timed cycle
-    if (seconds === '00') {
-        updateScheduleDisplay();
+    // --- UPDATE: Run schedule display update EVERY second ---
+    // This ensures the "time remaining" counts down visually each second.
+    updateScheduleDisplay();
+
+    // --- Moved Refresh Logic Here ---
+    // Check for scheduled refresh only at the start of the minute (seconds === 0)
+    if (seconds === 0) {
+        // Set the refresh times (6 AM and 7 AM)
+        const refreshTimes = [6, 7]; // 6 AM, 7 AM
+
+        // Check if the current time matches one of the refresh times on the hour
+        if (refreshTimes.includes(hours) && minutes === 0) {
+            console.log(`Refreshing page at ${hoursStr}:${minutesStr}...`);
+            location.reload();
+        }
     }
 }
 
-function updateTime() {
-    const now = new Date();
-    const hours = now.getHours().toString().padStart(2, '0');
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const seconds = now.getSeconds().toString().padStart(2, '0');
-
-    // Update clock display every second
-    elements.timeEl.textContent = `${hours}:${minutes}:${seconds}`;
-
-    // OPTIMIZATION: Update schedule display only once per minute (when seconds are 00)
-    if (seconds === '00') {
-        updateScheduleDisplay();
-    }
-}
+// --- REMOVED the duplicate/old updateTime function ---
 
 // Weather functionality (already reasonably optimized with caching)
 function setupWeather() {
@@ -122,9 +120,9 @@ function setupWeather() {
                     localStorage.setItem("wxTemp", temp.toString()); // Store as string
                     localStorage.setItem("wxTime", Date.now().toString()); // Store as string
                 } else {
-                     // Handle cases where data might be missing expected fields
-                     console.warn("Weather data received but format is unexpected:", data);
-                     elements.tempElement.textContent = "--°"; // Indicate missing data
+                    // Handle cases where data might be missing expected fields
+                    console.warn("Weather data received but format is unexpected:", data);
+                    elements.tempElement.textContent = "--°"; // Indicate missing data
                 }
             })
             .catch(error => {
@@ -160,8 +158,8 @@ function setupDate() {
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const msUntilMidnight = tomorrow.getTime() - now.getTime(); // Use getTime() for clarity
 
-    // Set up update at midnight
-    setTimeout(() => {
+    // Set up update at midnight (store timeout ID)
+    midnightUpdateTimeoutId = setTimeout(() => { // Assign to global timeout ID
         updateDate();
         // Then update every 24 hours
         setInterval(updateDate, 24 * 60 * 60 * 1000); // Use calculation for clarity
@@ -172,17 +170,16 @@ function setupDate() {
 const timeUtils = {
     // Convert time string (HH:MM) to minutes since midnight
     timeToMinutes: timeString => {
-        // OPTIMIZATION: Slightly faster split and parse
         const parts = timeString.split(':');
         const hours = parseInt(parts[0], 10);
-        const minutes = parseInt(parts[1] || '0', 10); // Handle cases like "14" -> 14:00
+        const minutes = parseInt(parts[1] || '0', 10);
         return hours * 60 + minutes;
     },
 
     // Format remaining time in a readable way
     formatRemaining: minutes => {
         if (minutes < 1) {
-             // Ensure we don't show negative seconds if update timing is slightly off
+            // Ensure we don't show negative seconds if update timing is slightly off
             return `${Math.max(0, Math.floor(minutes * 60))} sec`;
         }
 
@@ -210,17 +207,12 @@ class Schedule {
     parseSchedule(scheduleString) {
         return scheduleString.split(',').map(part => {
             const [startTime, name, endTime] = part.split(';');
-            // OPTIMIZATION: Pre-calculate minutes from midnight
             const startTimeMinutes = timeUtils.timeToMinutes(startTime);
-            // endTime might be null for the last period if string format allows
             const endTimeMinutes = endTime ? timeUtils.timeToMinutes(endTime) : null;
 
             return {
-                startTime, // Keep original string if needed elsewhere
-                name,
-                endTime, // Keep original string if needed elsewhere
-                startTimeMinutes,
-                endTimeMinutes
+                startTime, name, endTime,
+                startTimeMinutes, endTimeMinutes
             };
         });
     }
@@ -228,31 +220,11 @@ class Schedule {
 
 // Schedule data - daily schedules (no changes needed)
 const scheduleData = {
-    // Monday
-    1: [
-        "7:00;Good Morning!;7:30,7:30;Teacher Office Hours;7:45,7:45;Period 1;9:19,9:19;Passing Period;9:24,9:24;Period 2;10:58,10:58;A Lunch;11:32,11:32;Passing Period;11:37,11:37;Period 3;13:11,13:11;Passing Period;13:16,13:16;Period 4;14:50",
-        "10:58;Passing Period;11:03,11:03;Period 3;12:37,12:37;B Lunch;13:11"
-    ],
-    // Tuesday
-    2: [
-        "7:00;Good Morning!;7:30,7:30;Teacher PLC;8:05,8:05;Period 5;9:39,9:39;Homeroom;9:49,9:49;S.A.S.;10:56,10:56;A Lunch;11:32,11:32;Passing Period;11:37,11:37;Period 6;13:11,13:11;Passing Period;13:16,13:16;Period 7;14:50",
-        "10:56;Passing Period;11:01,11:01;Period 6;12:35,12:35;B Lunch;13:11"
-    ],
-    // Wednesday
-    3: [
-        "7:00;Good Morning!;7:30,7:30;Teacher Office Hours;7:45,7:45;Period 1;9:19,9:19;Passing Period;9:24,9:24;Period 2;10:58,10:58;A Lunch;11:32,11:32;Passing Period;11:37,11:37;Period 3;13:11,13:11;Passing Period;13:16,13:16;Period 4;14:50",
-        "10:58;Passing Period;11:03,11:03;Period 3;12:37,12:37;B Lunch;13:11"
-    ],
-    // Thursday
-    4: [
-        "7:00;Good Morning!;7:30,7:30;Teacher PLC;8:05,8:05;Period 5;9:39,9:39;Homeroom;9:49,9:49;Eagle Time;10:56,10:56;A Lunch;11:32,11:32;Passing Period;11:37,11:37;Period 6;13:11,13:11;Passing Period;13:16,13:16;Period 7;14:50",
-        "10:56;Passing Period;11:01,11:01;Period 6;12:35,12:35;B Lunch;13:11"
-    ],
-    // Friday
-    5: [
-        "7:00;Happy Friday!;7:30,7:30;Teacher Office Hours;7:45,7:45;Period 1;8:36,8:36;Passing Period;8:41,8:41;Period 2;9:32,9:32;Passing Period;9:37,9:37;Period 3;10:28,10:28;Passing Period;10:33,10:33;Period 4;11:24,11:24;A Lunch;12:02,12:02;Passing Period;12:07,12:07;Period 5;12:58,12:58;Passing Period;13:03,13:03;Period 6;13:54,13:54;Passing Period;13:59,13:59;Period 7;14:50",
-        "11:24;Passing Period;11:29,11:29;Period 5;12:20,12:20;B Lunch;12:58"
-    ]
+    1: ["7:00;Good Morning!;7:30,7:30;Teacher Office Hours;7:45,7:45;Period 1;9:19,9:19;Passing Period;9:24,9:24;Period 2;10:58,10:58;A Lunch;11:32,11:32;Passing Period;11:37,11:37;Period 3;13:11,13:11;Passing Period;13:16,13:16;Period 4;14:50", "10:58;Passing Period;11:03,11:03;Period 3;12:37,12:37;B Lunch;13:11"],
+    2: ["7:00;Good Morning!;7:30,7:30;Teacher PLC;8:05,8:05;Period 5;9:39,9:39;Homeroom;9:49,9:49;S.A.S.;10:56,10:56;A Lunch;11:32,11:32;Passing Period;11:37,11:37;Period 6;13:11,13:11;Passing Period;13:16,13:16;Period 7;14:50", "10:56;Passing Period;11:01,11:01;Period 6;12:35,12:35;B Lunch;13:11"],
+    3: ["7:00;Good Morning!;7:30,7:30;Teacher Office Hours;7:45,7:45;Period 1;9:19,9:19;Passing Period;9:24,9:24;Period 2;10:58,10:58;A Lunch;11:32,11:32;Passing Period;11:37,11:37;Period 3;13:11,13:11;Passing Period;13:16,13:16;Period 4;14:50", "10:58;Passing Period;11:03,11:03;Period 3;12:37,12:37;B Lunch;13:11"],
+    4: ["7:00;Good Morning!;7:30,7:30;Teacher PLC;8:05,8:05;Period 5;9:39,9:39;Homeroom;9:49,9:49;Eagle Time;10:56,10:56;A Lunch;11:32,11:32;Passing Period;11:37,11:37;Period 6;13:11,13:11;Passing Period;13:16,13:16;Period 7;14:50", "10:56;Passing Period;11:01,11:01;Period 6;12:35,12:35;B Lunch;13:11"],
+    5: ["7:00;Happy Friday!;7:30,7:30;Teacher Office Hours;7:45,7:45;Period 1;8:36,8:36;Passing Period;8:41,8:41;Period 2;9:32,9:32;Passing Period;9:37,9:37;Period 3;10:28,10:28;Passing Period;10:33,10:33;Period 4;11:24,11:24;A Lunch;12:02,12:02;Passing Period;12:07,12:07;Period 5;12:58,12:58;Passing Period;13:03,13:03;Period 6;13:54,13:54;Passing Period;13:59,13:59;Period 7;14:50", "11:24;Passing Period;11:29,11:29;Period 5;12:20,12:20;B Lunch;12:58"]
 };
 
 // Cache for daily schedules
@@ -263,103 +235,80 @@ let allSortedPeriods = [];
 // Initialize schedules and pre-calculate/sort periods
 function initializeSchedules() {
     const now = new Date();
-    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const dayOfWeek = now.getDay();
 
-    // Clear current schedules and sorted periods
     currentSchedules = [null, null];
-    allSortedPeriods = []; // OPTIMIZATION: Clear the sorted list
+    allSortedPeriods = [];
 
-    // Only initialize if it's a weekday
     if (dayOfWeek >= 1 && dayOfWeek <= 5) {
         const daySchedules = scheduleData[dayOfWeek];
         if (daySchedules && daySchedules.length > 0) {
-            // Initialize Schedule objects (which now pre-calculate minutes)
             currentSchedules[0] = new Schedule(daySchedules[0]);
             if (daySchedules.length > 1) {
                  currentSchedules[1] = new Schedule(daySchedules[1]);
             }
 
-            // OPTIMIZATION: Collect, dedup, and sort all periods for the day *once*
-            const tempPeriodsMap = new Map(); // Use Map for easy deduplication based on start time + name
-
+            const tempPeriodsMap = new Map();
             for (const schedule of currentSchedules) {
                 if (!schedule) continue;
                 for (const period of schedule.periods) {
-                    // Ensure period has essential timing info
                     if (period.startTimeMinutes != null && period.endTimeMinutes != null) {
-                        // Use a composite key for uniqueness if names can be the same at the same time (unlikely but safe)
                         const key = `${period.startTimeMinutes}-${period.name}`;
                         if (!tempPeriodsMap.has(key)) {
                              tempPeriodsMap.set(key, {
                                 name: period.name,
-                                startTime: period.startTime, // Keep original format if needed
+                                startTime: period.startTime,
                                 startTimeMinutes: period.startTimeMinutes
-                                // No need for endTime here, only used for finding *next* start
                              });
                         }
                     }
                 }
             }
-            // Convert map values to array and sort by start time
             allSortedPeriods = Array.from(tempPeriodsMap.values())
                                   .sort((a, b) => a.startTimeMinutes - b.startTimeMinutes);
         }
     }
-     // Ensure schedule display is updated after potentially clearing schedules (e.g., going from Friday to Saturday)
-     updateScheduleDisplay();
+     updateScheduleDisplay(); // Update display immediately after loading schedules
 }
 
 // Get current period information - uses pre-calculated minutes
 function getCurrentPeriodInfo(scheduleObj, currentTimeInMinutes) {
     if (!scheduleObj || !scheduleObj.periods) return { inSession: false };
 
-    const now = new Date(); // Get current time again for seconds precision if needed
+    const now = new Date(); // Get current time again for seconds precision
     const currentSeconds = now.getSeconds();
 
-    // Check each period in the schedule
     for (const period of scheduleObj.periods) {
-        // Use pre-calculated minutes; ensure endTime is valid
         if (period.startTimeMinutes == null || period.endTimeMinutes == null) continue;
 
-        // Check if current time is within this period
         if (currentTimeInMinutes >= period.startTimeMinutes && currentTimeInMinutes < period.endTimeMinutes) {
-            // Calculate progress using pre-calculated minutes
             const totalDuration = period.endTimeMinutes - period.startTimeMinutes;
-            // Ensure totalDuration is positive to avoid division by zero or negative progress
-             if (totalDuration <= 0) continue;
+             if (totalDuration <= 0) continue; // Avoid division by zero
 
             const elapsed = currentTimeInMinutes - period.startTimeMinutes;
-            // Remaining minutes (fractional) based on current time including seconds
             const remainingWithSeconds = (period.endTimeMinutes - currentTimeInMinutes) - (currentSeconds / 60);
-            // Calculate progress including seconds
-             const progress = ((elapsed + (currentSeconds / 60)) / totalDuration) * 100;
-
+            const progress = ((elapsed + (currentSeconds / 60)) / totalDuration) * 100;
 
             return {
                 inSession: true,
                 name: period.name,
                 timeRemaining: timeUtils.formatRemaining(remainingWithSeconds),
-                // Ensure progress doesn't exceed 100 due to timing/rounding
-                progress: Math.min(100, progress).toFixed(1)
+                progress: Math.min(100, progress).toFixed(1) // Cap progress at 100
             };
         }
     }
-
-    return { inSession: false }; // No active period found in this schedule
+    return { inSession: false };
 }
 
 // Find the next period - uses pre-calculated and sorted list
 function getNextPeriodInfo(currentTimeInMinutes) {
-    // OPTIMIZATION: Use the pre-sorted list 'allSortedPeriods'
     if (allSortedPeriods.length === 0) return { available: false };
 
-    const now = new Date(); // Get current time again for seconds precision
+    const now = new Date();
     const currentSeconds = now.getSeconds();
 
-    // Find the first period in the sorted list that starts after the current time
     for (const period of allSortedPeriods) {
         if (period.startTimeMinutes > currentTimeInMinutes) {
-             // Calculate time until start including seconds adjustment
              const timeUntilStartMinutes = period.startTimeMinutes - currentTimeInMinutes;
              const timeUntilStartWithSeconds = timeUntilStartMinutes - (currentSeconds / 60);
 
@@ -370,8 +319,7 @@ function getNextPeriodInfo(currentTimeInMinutes) {
             };
         }
     }
-
-    return { available: false }; // No future periods found for today
+    return { available: false };
 }
 
 
@@ -379,62 +327,33 @@ function getNextPeriodInfo(currentTimeInMinutes) {
 function getCurrentScheduleInfo() {
     const now = new Date();
     const dayOfWeek = now.getDay();
-    // Calculate current time in minutes past midnight
     const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
 
-    // Handle weekend case first
-    if (dayOfWeek === 0 || dayOfWeek === 6) { // 0 = Sunday, 6 = Saturday
-        return {
-            inSession: false,
-            message: "Weekend - No School",
-            needsTwoProgressBars: false,
-            scheduleA: { inSession: false }, // Ensure these exist but are inactive
-            scheduleB: { inSession: false },
-            nextPeriod: { available: false }
-        };
+    if (dayOfWeek === 0 || dayOfWeek === 6) {
+        return { inSession: false, message: "Weekend - No School", needsTwoProgressBars: false, scheduleA: { inSession: false }, scheduleB: { inSession: false }, nextPeriod: { available: false } };
+    }
+    if (!currentSchedules[0]) {
+        return { inSession: false, message: "No schedule available", needsTwoProgressBars: false, scheduleA: { inSession: false }, scheduleB: { inSession: false }, nextPeriod: { available: false } };
     }
 
-    // Check if schedules were loaded for the weekday
-    if (!currentSchedules[0]) { // If schedule A isn't loaded, assume none are
-        return {
-            inSession: false,
-            message: "No schedule available",
-            needsTwoProgressBars: false,
-             scheduleA: { inSession: false },
-            scheduleB: { inSession: false },
-            nextPeriod: { available: false }
-        };
-    }
-
-    // Get info for schedule A using the current time in minutes
     const scheduleAInfo = getCurrentPeriodInfo(currentSchedules[0], currentTimeInMinutes);
-
-    // Get info for schedule B (if it exists)
-    const scheduleBInfo = currentSchedules[1]
-        ? getCurrentPeriodInfo(currentSchedules[1], currentTimeInMinutes)
-        : { inSession: false }; // Default if no B schedule
-
-    // Determine if we need both progress bars (only if B schedule is *currently* in session)
+    const scheduleBInfo = currentSchedules[1] ? getCurrentPeriodInfo(currentSchedules[1], currentTimeInMinutes) : { inSession: false };
     const needsTwoProgressBars = scheduleBInfo.inSession;
-
-     // Find the next period using the optimized function
-     const nextPeriodInfo = getNextPeriodInfo(currentTimeInMinutes);
-
+    const nextPeriodInfo = getNextPeriodInfo(currentTimeInMinutes);
 
     return {
-        inSession: scheduleAInfo.inSession || scheduleBInfo.inSession, // Overall session status
+        inSession: scheduleAInfo.inSession || scheduleBInfo.inSession,
         needsTwoProgressBars,
         scheduleA: scheduleAInfo,
         scheduleB: scheduleBInfo,
-        nextPeriod: nextPeriodInfo // Use the result from the optimized function
+        nextPeriod: nextPeriodInfo
     };
 }
 
-// Update the schedule display - Called once per minute now
+// Update the schedule display - Called every second now
 function updateScheduleDisplay() {
-    const scheduleInfo = getCurrentScheduleInfo();
+    const scheduleInfo = getCurrentScheduleInfo(); // Recalculate current state
 
-    // Determine the primary display info (active A period, active B period, next period, or end of day)
     let displayInfoA = { name: "Loading...", timeRemaining: "", progress: 0, active: false };
     let displayInfoB = { name: "", timeRemaining: "", progress: 0, active: false };
     let showBar1 = false;
@@ -445,75 +364,54 @@ function updateScheduleDisplay() {
             displayInfoA = { ...scheduleInfo.scheduleA, active: true };
             showBar1 = true;
         }
-        // Schedule B info is only relevant if it needs its own bar
         if (scheduleInfo.needsTwoProgressBars && scheduleInfo.scheduleB.inSession) {
              displayInfoB = { ...scheduleInfo.scheduleB, active: true };
              showBar2 = true;
-             // If A wasn't in session but B is (e.g., during B lunch split), show B info in Bar 1
-             if (!scheduleInfo.scheduleA.inSession) {
-                displayInfoA = displayInfoB; // Copy B info to A display slot
+             if (!scheduleInfo.scheduleA.inSession) { // B Lunch case where B is primary display
+                displayInfoA = displayInfoB;
                 showBar1 = true;
-                showBar2 = false; // Don't show the second bar in this specific case
+                showBar2 = false;
              }
-        } else if (!scheduleInfo.scheduleA.inSession && scheduleInfo.scheduleB.inSession) {
-            // Case: Only B schedule is active (e.g., B Lunch), display it in Bar 1
+        } else if (!scheduleInfo.scheduleA.inSession && scheduleInfo.scheduleB.inSession) { // Only B active
             displayInfoA = { ...scheduleInfo.scheduleB, active: true };
             showBar1 = true;
         }
-    } else if (scheduleInfo.nextPeriod.available) {
-        // Not in session, but there's a next period
-        displayInfoA = {
-            name: `Next: ${scheduleInfo.nextPeriod.name}`,
-            timeRemaining: `in ${scheduleInfo.nextPeriod.timeUntilStart}`,
-            progress: 0, // No progress for future period
-            active: false
-        };
+    } else if (scheduleInfo.nextPeriod.available) { // Between periods
+        displayInfoA = { name: `Next: ${scheduleInfo.nextPeriod.name}`, timeRemaining: `in ${scheduleInfo.nextPeriod.timeUntilStart}`, progress: 0, active: false };
         showBar1 = true;
-    } else {
-         // Not in session and no more periods today (or weekend/no schedule)
-         displayInfoA = {
-             name: scheduleInfo.message || "End of School Day", // Use message if available (Weekend/No Schedule)
-             timeRemaining: "",
-             progress: 0,
-             active: false
-         };
-         showBar1 = true; // Still show bar 1 for the message
+    } else { // End of day or weekend/no schedule
+         displayInfoA = { name: scheduleInfo.message || "End of School Day", timeRemaining: "", progress: 0, active: false };
+         showBar1 = true;
     }
 
-
-    // Update Bar 1 (Main Display)
+    // Update Bar 1 DOM
     if (showBar1) {
         elements.bar1Name.textContent = displayInfoA.name;
         elements.bar1Remaining.textContent = displayInfoA.timeRemaining;
         elements.bar1Progress.style.width = displayInfoA.active ? `${displayInfoA.progress}%` : '0%';
-        if (displayInfoA.active) {
-            elements.bar1.classList.add('active');
-        } else {
-            elements.bar1.classList.remove('active');
-        }
+        elements.bar1.classList.toggle('active', displayInfoA.active);
         elements.bar1.style.display = 'flex';
     } else {
         elements.bar1.style.display = 'none';
     }
 
-    // Update Bar 2 (Secondary/B Schedule Display)
+    // Update Bar 2 DOM
     if (showBar2) {
         elements.bar2Name.textContent = displayInfoB.name;
         elements.bar2Remaining.textContent = displayInfoB.timeRemaining;
         elements.bar2Progress.style.width = `${displayInfoB.progress}%`;
-        elements.bar2.classList.add('active'); // Already checked B is active
+        elements.bar2.classList.add('active'); // Must be active to be shown here
         elements.bar2.style.display = 'flex';
     } else {
         elements.bar2.style.display = 'none';
     }
 }
 
-// Check for admin commands (already reasonably optimized with setTimeout)
+// Check for admin commands
 async function checkCommands() {
     try {
-        // Ensure using HTTPS for the command endpoint
         const devLink = "https://script.google.com/macros/s/AKfycbxZe6A-GKnGcv9efNxrMeSNvxcYC2MhOvqQkQLNpIiQOqcJCSuCTauq0k7Pwuz4OIcf/exec";
-        const response = await fetch(devLink, { cache: "no-store" }); // Prevent potential caching issues
+        const response = await fetch(devLink, { cache: "no-store" });
         if (!response.ok) {
              throw new Error(`Command fetch HTTP error! status: ${response.status}`);
         }
@@ -523,76 +421,58 @@ async function checkCommands() {
             location.reload();
         } else if (command === "wipe-storage") {
             localStorage.clear();
-            location.reload(); // Reload after wiping to apply changes/clear state
+            location.reload();
         }
-        // If no specific command, or after handling one, schedule the next check
         setTimeout(checkCommands, 300000); // Check again in 5 minutes
-
     } catch (error) {
         console.error("Command check error:", error);
-        // Retry after 5 minutes even on error
-        setTimeout(checkCommands, 300000);
+        setTimeout(checkCommands, 300000); // Retry after 5 minutes
     }
 }
 
 // --- Initialization ---
-
-// Store timeout IDs to potentially clear them if re-initializing
-let midnightUpdateTimeoutId = null;
-let midnightScheduleResetTimeoutId = null;
+let midnightUpdateTimeoutId = null; // For date update
+let midnightScheduleResetTimeoutId = null; // For schedule reset
+let dailyScheduleResetIntervalId = null; // Interval for resets after the first midnight
 
 function init() {
     console.log("Initializing Dashboard...");
     cacheElements();
 
-    // Clear any existing timeouts (good practice if re-initializing)
-    if (clockTimeoutId) clearTimeout(clockTimeoutId); // Clear clock timeout too
+    // Clear any existing timers from previous runs or failed initializations
+    if (clockTimeoutId) clearTimeout(clockTimeoutId);
     if (midnightUpdateTimeoutId) clearTimeout(midnightUpdateTimeoutId);
     if (midnightScheduleResetTimeoutId) clearTimeout(midnightScheduleResetTimeoutId);
+    if (dailyScheduleResetIntervalId) clearInterval(dailyScheduleResetIntervalId); // Clear interval too
 
-    initializeSchedules();
-
-    // Set up clock (now starts the self-adjusting loop)
-    setupClock(); // <-- This now calls runClockCycle which starts the loop
-
+    initializeSchedules(); // Load today's schedule first
+    setupClock(); // Starts the main clock/update cycle
     setupWeather();
-    setupDate();
-    updateScheduleDisplay(); // Initial display update
-    checkCommands();
+    setupDate(); // Sets up date display and its midnight update timer
+    // updateScheduleDisplay(); // No longer needed here, called within first clock cycle
+    checkCommands(); // Start checking for commands
 
-    // Midnight schedule reset logic remains the same
+    // --- Midnight Schedule Reset ---
     const now = new Date();
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const timeUntilMidnight = tomorrow.getTime() - now.getTime();
 
+    console.log(`Scheduling next schedule reset in ${timeUntilMidnight / 1000 / 60} minutes`);
     midnightScheduleResetTimeoutId = setTimeout(() => {
         console.log("Midnight: Re-initializing schedules for the new day.");
-        initializeSchedules();
-        setInterval(() => {
-            console.log("Midnight: Re-initializing schedules for the new day.");
+        initializeSchedules(); // Reload schedules for the new day
+
+        // After the first midnight reset, set up a daily interval
+        dailyScheduleResetIntervalId = setInterval(() => {
+            console.log("Daily Interval: Re-initializing schedules.");
             initializeSchedules();
-        }, 24 * 60 * 60 * 1000);
+        }, 24 * 60 * 60 * 1000); // Repeat every 24 hours
     }, timeUntilMidnight);
 
     console.log("Initialization Complete.");
 }
 
+// --- REMOVED standalone refreshAtSpecificTimes function and its interval ---
+
 // --- Start Everything ---
 document.addEventListener('DOMContentLoaded', init);
-
-function refreshAtSpecificTimes() {
-    const now = new Date();
-    const hours = now.getHours();
-    const minutes = now.getMinutes();
-
-    // Set the refresh times (6 AM and 7 AM)
-    const refreshTimes = [6, 7];
-
-    // Check if the current time matches 6 AM or 7 AM
-    if (refreshTimes.includes(hours) && minutes === 0) {
-        location.reload();
-    }
-}
-
-// Check the time every minute
-setInterval(refreshAtSpecificTimes, 60000);
