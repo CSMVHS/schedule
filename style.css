@@ -45,7 +45,6 @@
     padding: 0;
     box-sizing: border-box;
     font-family: 'DM Sans', sans-serif;
-    transition: 0.3s ease;
     outline: none;
     scrollbar-width: none;
     line-height: 1;
@@ -137,7 +136,6 @@ div.site div.bars div.bar div.progress {
     width: 50%;
     background-position: 0 100%;
     animation-fill-mode: forwards;
-    transition: 1s linear;
 }
 
 div.site div.bars div.bar div.name-container {
