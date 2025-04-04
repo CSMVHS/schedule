@@ -28,20 +28,47 @@ function cacheElements() {
     elements.bar2Progress = elements.bar2.querySelector('.progress');
 }
 
-// Clock functionality - optimized for performance
+// Store the timeout ID so we can potentially cancel it if needed (though not strictly necessary here)
+let clockTimeoutId = null;
+
+// Clock functionality - using self-adjusting setTimeout for accuracy
 function setupClock() {
-    updateTime(); // Update time immediately
+    // --- Remove the old setInterval logic ---
+    // No initial sync setTimeout needed, the loop handles it.
+    // No setInterval used anymore.
 
-    // Sync to the start of the next second
+    // Start the clock loop
+    runClockCycle();
+}
+
+function runClockCycle() {
+    // 1. Update the display with the current time
+    updateTimeDisplay(); // Renamed the core display logic
+
+    // 2. Calculate the delay until the next whole second
     const now = new Date();
-    const ms = now.getMilliseconds();
-    const timeToNextSecond = 1000 - ms;
+    const delayUntilNextSecond = 1000 - now.getMilliseconds();
 
-    setTimeout(() => {
-        updateTime(); // Update again right on the second boundary
-        // Set interval precisely on the second
-        setInterval(updateTime, 1000);
-    }, timeToNextSecond);
+    // 3. Schedule the next cycle
+    // Use setTimeout to run this function again after the calculated delay
+    clockTimeoutId = setTimeout(runClockCycle, delayUntilNextSecond);
+}
+
+// Renamed function to focus purely on updating the DOM element for time
+function updateTimeDisplay() {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+
+    // Update clock display
+    elements.timeEl.textContent = `${hours}:${minutes}:${seconds}`;
+
+    // OPTIMIZATION: Update schedule display only once per minute (when seconds are 00)
+    // This check remains the same, but it's now within the accurately timed cycle
+    if (seconds === '00') {
+        updateScheduleDisplay();
+    }
 }
 
 function updateTime() {
@@ -516,49 +543,38 @@ let midnightScheduleResetTimeoutId = null;
 
 function init() {
     console.log("Initializing Dashboard...");
-    // Cache DOM elements first
     cacheElements();
 
-    // Clear any existing timeouts if init is called again (e.g., during development)
+    // Clear any existing timeouts (good practice if re-initializing)
+    if (clockTimeoutId) clearTimeout(clockTimeoutId); // Clear clock timeout too
     if (midnightUpdateTimeoutId) clearTimeout(midnightUpdateTimeoutId);
     if (midnightScheduleResetTimeoutId) clearTimeout(midnightScheduleResetTimeoutId);
 
-
-    // Initialize schedules (creates Schedule objects and sorted period list)
     initializeSchedules();
 
-    // Set up clock (starts ticking immediately and syncs interval)
-    setupClock();
+    // Set up clock (now starts the self-adjusting loop)
+    setupClock(); // <-- This now calls runClockCycle which starts the loop
 
-    // Set up weather (fetches initial data or uses cache)
     setupWeather();
-
-    // Set up date (displays current date and schedules midnight update)
-    setupDate(); // Also schedules its own midnight update
-
-    // Perform the first update of the schedule display based on initialized data
-    updateScheduleDisplay();
-
-    // Start checking for admin commands
+    setupDate();
+    updateScheduleDisplay(); // Initial display update
     checkCommands();
 
-    // Reset schedules at midnight (using the same logic as date update)
+    // Midnight schedule reset logic remains the same
     const now = new Date();
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const timeUntilMidnight = tomorrow.getTime() - now.getTime();
 
-     // Use a separate timeout for the schedule reset
     midnightScheduleResetTimeoutId = setTimeout(() => {
         console.log("Midnight: Re-initializing schedules for the new day.");
-        initializeSchedules(); // Re-run schedule init to load the correct day's schedule
-        // Schedule the *next* midnight reset
-         setInterval(() => {
-              console.log("Midnight: Re-initializing schedules for the new day.");
-              initializeSchedules();
-         }, 24 * 60 * 60 * 1000);
+        initializeSchedules();
+        setInterval(() => {
+            console.log("Midnight: Re-initializing schedules for the new day.");
+            initializeSchedules();
+        }, 24 * 60 * 60 * 1000);
     }, timeUntilMidnight);
 
-     console.log("Initialization Complete.");
+    console.log("Initialization Complete.");
 }
 
 // --- Start Everything ---
