@@ -1,30 +1,50 @@
-// Global elements ... (no changes needed here)
-// cacheElements() ... (no changes needed here)
+// Global elements to avoid frequent DOM queries
+const elements = {
+    timeEl: null,
+    tempElement: null,
+    dateElement: null,
+    bar1: null,
+    bar1Name: null,
+    bar1Remaining: null,
+    bar1Progress: null,
+    bar2: null,
+    bar2Name: null,
+    bar2Remaining: null,
+    bar2Progress: null
+};
 
+// Cache DOM elements on load
+function cacheElements() {
+    elements.timeEl = document.querySelector("div.bar div.clock p.time");
+    elements.tempElement = document.querySelector('div.bar div.weather p.temperature');
+    elements.dateElement = document.querySelector('div.bar div.date p.date');
+    elements.bar1 = document.getElementById('bar1');
+    elements.bar1Name = elements.bar1.querySelector('.name');
+    elements.bar1Remaining = elements.bar1.querySelector('.remaining');
+    elements.bar1Progress = elements.bar1.querySelector('.progress');
+    elements.bar2 = document.getElementById('bar2');
+    elements.bar2Name = elements.bar2.querySelector('.name');
+    elements.bar2Remaining = elements.bar2.querySelector('.remaining');
+    elements.bar2Progress = elements.bar2.querySelector('.progress');
+}
+
+// Store the timeout ID
 let clockTimeoutId = null;
 
+// Clock functionality - using self-adjusting setTimeout for accuracy
 function setupClock() {
     runClockCycle();
 }
 
 function runClockCycle() {
-    // Get the timestamp for this specific cycle *once*
     const now = new Date();
-
-    // 1. Update the display using this timestamp
-    updateTimeAndScheduleDisplay(now); // Pass the timestamp
-
-    // 2. Calculate the delay until the next whole second based on when we started
-    // Ensure a minimum delay
+    updateTimeAndScheduleDisplay(now);
     const delayUntilNextSecond = Math.max(50, 1000 - now.getMilliseconds());
-
-    // 3. Schedule the next cycle
     clockTimeoutId = setTimeout(runClockCycle, delayUntilNextSecond);
 }
 
 // Function now accepts the timestamp for the current cycle
 function updateTimeAndScheduleDisplay(now) {
-    // Use the passed 'now' object for all time components in this cycle
     const hours = now.getHours();
     const minutes = now.getMinutes();
     const seconds = now.getSeconds();
@@ -37,9 +57,9 @@ function updateTimeAndScheduleDisplay(now) {
     elements.timeEl.textContent = `${hoursStr}:${minutesStr}:${secondsStr}`;
 
     // Update schedule display using the same timestamp
-    updateScheduleDisplay(now); // Pass the timestamp down
+    updateScheduleDisplay(now);
 
-    // Check for scheduled refresh only at the start of the minute (seconds === 0)
+    // Check for scheduled refresh only at the start of the minute
     if (seconds === 0) {
         const refreshTimes = [6, 7]; // 6 AM, 7 AM
         if (refreshTimes.includes(hours) && minutes === 0) {
@@ -49,167 +69,7 @@ function updateTimeAndScheduleDisplay(now) {
     }
 }
 
-// --- updateScheduleDisplay now accepts the timestamp ---
-function updateScheduleDisplay(now) { // Added 'now' parameter
-    // Pass the timestamp down to get schedule info based on this exact moment
-    const scheduleInfo = getCurrentScheduleInfo(now);
-
-    // ... (rest of the display logic remains the same) ...
-
-    let displayInfoA = { name: "Loading...", timeRemaining: "", progress: 0, active: false };
-    let displayInfoB = { name: "", timeRemaining: "", progress: 0, active: false };
-    let showBar1 = false;
-    let showBar2 = false;
-
-    if (scheduleInfo.inSession) {
-        if (scheduleInfo.scheduleA.inSession) {
-            displayInfoA = { ...scheduleInfo.scheduleA, active: true };
-            showBar1 = true;
-        }
-        if (scheduleInfo.needsTwoProgressBars && scheduleInfo.scheduleB.inSession) {
-             displayInfoB = { ...scheduleInfo.scheduleB, active: true };
-             showBar2 = true;
-             if (!scheduleInfo.scheduleA.inSession) {
-                displayInfoA = displayInfoB;
-                showBar1 = true;
-                showBar2 = false;
-             }
-        } else if (!scheduleInfo.scheduleA.inSession && scheduleInfo.scheduleB.inSession) {
-            displayInfoA = { ...scheduleInfo.scheduleB, active: true };
-            showBar1 = true;
-        }
-    } else if (scheduleInfo.nextPeriod.available) {
-        displayInfoA = { name: `Next: ${scheduleInfo.nextPeriod.name}`, timeRemaining: `in ${scheduleInfo.nextPeriod.timeUntilStart}`, progress: 0, active: false };
-        showBar1 = true;
-    } else {
-         displayInfoA = { name: scheduleInfo.message || "End of School Day", timeRemaining: "", progress: 0, active: false };
-         showBar1 = true;
-    }
-
-    // Update Bar 1 DOM
-    if (showBar1) {
-        elements.bar1Name.textContent = displayInfoA.name;
-        elements.bar1Remaining.textContent = displayInfoA.timeRemaining;
-        elements.bar1Progress.style.width = displayInfoA.active ? `${displayInfoA.progress}%` : '0%';
-        elements.bar1.classList.toggle('active', displayInfoA.active);
-        elements.bar1.style.display = 'flex';
-    } else {
-        elements.bar1.style.display = 'none';
-    }
-
-    // Update Bar 2 DOM
-    if (showBar2) {
-        elements.bar2Name.textContent = displayInfoB.name;
-        elements.bar2Remaining.textContent = displayInfoB.timeRemaining;
-        elements.bar2Progress.style.width = `${displayInfoB.progress}%`;
-        elements.bar2.classList.add('active');
-        elements.bar2.style.display = 'flex';
-    } else {
-        elements.bar2.style.display = 'none';
-    }
-}
-
-
-// --- getCurrentScheduleInfo now accepts the timestamp ---
-function getCurrentScheduleInfo(now) { // Added 'now' parameter
-    // Use the passed 'now' object instead of creating a new Date()
-    const dayOfWeek = now.getDay();
-    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-
-    // Handle weekend case first
-    if (dayOfWeek === 0 || dayOfWeek === 6) {
-        return { inSession: false, message: "Weekend - No School", needsTwoProgressBars: false, scheduleA: { inSession: false }, scheduleB: { inSession: false }, nextPeriod: { available: false } };
-    }
-
-    // Check if schedules were loaded for the weekday
-    if (!currentSchedules[0]) {
-        return { inSession: false, message: "No schedule available", needsTwoProgressBars: false, scheduleA: { inSession: false }, scheduleB: { inSession: false }, nextPeriod: { available: false } };
-    }
-
-    // Pass the 'now' object down to the period info functions
-    const scheduleAInfo = getCurrentPeriodInfo(currentSchedules[0], now); // Pass 'now'
-    const scheduleBInfo = currentSchedules[1]
-        ? getCurrentPeriodInfo(currentSchedules[1], now) // Pass 'now'
-        : { inSession: false };
-
-    const needsTwoProgressBars = scheduleBInfo.inSession;
-
-    // Pass the 'now' object down to get next period info
-    const nextPeriodInfo = getNextPeriodInfo(now); // Pass 'now'
-
-    return {
-        inSession: scheduleAInfo.inSession || scheduleBInfo.inSession,
-        needsTwoProgressBars,
-        scheduleA: scheduleAInfo,
-        scheduleB: scheduleBInfo,
-        nextPeriod: nextPeriodInfo
-    };
-}
-
-
-// --- getCurrentPeriodInfo now accepts the timestamp ---
-function getCurrentPeriodInfo(scheduleObj, now) { // Added 'now' parameter
-    if (!scheduleObj || !scheduleObj.periods) return { inSession: false };
-
-    // Use the passed 'now' object to get minutes and seconds for this cycle
-    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-    const currentSeconds = now.getSeconds();
-
-    // Check each period in the schedule
-    for (const period of scheduleObj.periods) {
-        if (period.startTimeMinutes == null || period.endTimeMinutes == null) continue;
-
-        if (currentTimeInMinutes >= period.startTimeMinutes && currentTimeInMinutes < period.endTimeMinutes) {
-            const totalDuration = period.endTimeMinutes - period.startTimeMinutes;
-             if (totalDuration <= 0) continue;
-
-            // Use currentTimeInMinutes and currentSeconds derived from the passed 'now'
-            const elapsed = currentTimeInMinutes - period.startTimeMinutes;
-            const remainingWithSeconds = (period.endTimeMinutes - currentTimeInMinutes) - (currentSeconds / 60);
-            const progress = ((elapsed + (currentSeconds / 60)) / totalDuration) * 100;
-
-            return {
-                inSession: true,
-                name: period.name,
-                timeRemaining: timeUtils.formatRemaining(remainingWithSeconds),
-                progress: Math.min(100, progress).toFixed(1)
-            };
-        }
-    }
-
-    return { inSession: false }; // No active period found in this schedule
-}
-
-// --- getNextPeriodInfo now accepts the timestamp ---
-function getNextPeriodInfo(now) { // Added 'now' parameter
-    if (allSortedPeriods.length === 0) return { available: false };
-
-    // Use the passed 'now' object to get minutes and seconds for this cycle
-    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-    const currentSeconds = now.getSeconds();
-
-    // Find the first period in the sorted list that starts after the current time
-    for (const period of allSortedPeriods) {
-        if (period.startTimeMinutes > currentTimeInMinutes) {
-             // Use currentTimeInMinutes and currentSeconds derived from the passed 'now'
-             const timeUntilStartMinutes = period.startTimeMinutes - currentTimeInMinutes;
-             const timeUntilStartWithSeconds = timeUntilStartMinutes - (currentSeconds / 60);
-
-            return {
-                available: true,
-                name: period.name,
-                timeUntilStart: timeUtils.formatRemaining(timeUntilStartWithSeconds)
-            };
-        }
-    }
-
-    return { available: false }; // No future periods found for today
-}
-
-
-// --- Remaining functions (setupWeather, setupDate, timeUtils, Schedule, scheduleData, initializeSchedules, checkCommands, init) have no changes ---
-
-// Weather functionality ... (no changes needed)
+// Weather functionality
 function setupWeather() {
     const apiKey = '7a08aa9c10a1a7edae637fa85fc3ecae';
     const apiUrl = `https://api.openweathermap.org/data/2.5/weather?q=Highlands%20Ranch,us&appid=${apiKey}&units=imperial`;
@@ -256,54 +116,52 @@ function setupWeather() {
     setInterval(fetchWeather, REFRESH_INTERVAL);
 }
 
-// Date functionality ... (no changes needed)
+// Date functionality
 function setupDate() {
-    let midnightUpdateTimeoutId = null; // Keep this local if only used here
+    let midnightDateUpdateTimeoutId = null; // Local timeout ID for date
     function updateDate() {
         const now = new Date();
         const month = (now.getMonth() + 1).toString().padStart(2, '0');
         const day = now.getDate().toString().padStart(2, '0');
         elements.dateElement.textContent = `${month}/${day}`;
     }
-    updateDate();
+    updateDate(); // Initial update
     const now = new Date();
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const msUntilMidnight = tomorrow.getTime() - now.getTime();
-    midnightUpdateTimeoutId = setTimeout(() => {
+    midnightDateUpdateTimeoutId = setTimeout(() => { // Use the local ID
         updateDate();
+        // Set interval *after* first midnight timeout fires
         setInterval(updateDate, 24 * 60 * 60 * 1000);
     }, msUntilMidnight);
 }
 
-// Time utility functions ... (no changes needed)
+// Time utility functions (Defined ONCE here)
 const timeUtils = {
-    timeToMinutes: timeString => { /* ... */ },
-    formatRemaining: minutes => { /* ... */ },
-    formatTime: (hours, minutes) => { /* ... */ }
-};
-// Explicitly defining the functions again for clarity, assuming they exist above
-timeUtils.timeToMinutes = timeString => {
-    const parts = timeString.split(':');
-    const hours = parseInt(parts[0], 10);
-    const minutes = parseInt(parts[1] || '0', 10);
-    return hours * 60 + minutes;
-};
-timeUtils.formatRemaining = minutes => {
-    if (minutes < 1) { return `${Math.max(0, Math.floor(minutes * 60))} sec`; }
-    const hrs = Math.floor(minutes / 60);
-    const mins = Math.floor(minutes % 60);
-    if (hrs === 0) return `${mins} min`;
-    if (mins === 0) return `${hrs} hr`;
-    return `${hrs} hr ${mins} min`;
-};
-timeUtils.formatTime = (hours, minutes) => {
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    timeToMinutes: timeString => {
+        const parts = timeString.split(':');
+        const hours = parseInt(parts[0], 10);
+        const minutes = parseInt(parts[1] || '0', 10);
+        return hours * 60 + minutes;
+    },
+    formatRemaining: minutes => {
+        if (minutes < 1) { return `${Math.max(0, Math.floor(minutes * 60))} sec`; }
+        const hrs = Math.floor(minutes / 60);
+        const mins = Math.floor(minutes % 60);
+        if (hrs === 0) return `${mins} min`;
+        if (mins === 0) return `${hrs} hr`;
+        return `${hrs} hr ${mins} min`;
+    },
+    formatTime: (hours, minutes) => {
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
 };
 
-
-// Schedule class ... (no changes needed)
+// Schedule class - OPTIMIZED to pre-calculate minutes
 class Schedule {
-    constructor(scheduleString) { this.periods = this.parseSchedule(scheduleString); }
+    constructor(scheduleString) {
+        this.periods = this.parseSchedule(scheduleString);
+    }
     parseSchedule(scheduleString) {
         return scheduleString.split(',').map(part => {
             const [startTime, name, endTime] = part.split(';');
@@ -314,7 +172,7 @@ class Schedule {
      }
 }
 
-// Explicitly defining the data again for clarity, assuming it exists above
+// Schedule data (Defined ONCE here)
 const scheduleData = {
     1: ["7:00;Good Morning!;7:30,7:30;Teacher Office Hours;7:45,7:45;Period 1;9:19,9:19;Passing Period;9:24,9:24;Period 2;10:58,10:58;A Lunch;11:32,11:32;Passing Period;11:37,11:37;Period 3;13:11,13:11;Passing Period;13:16,13:16;Period 4;14:50", "10:58;Passing Period;11:03,11:03;Period 3;12:37,12:37;B Lunch;13:11"],
     2: ["7:00;Good Morning!;7:30,7:30;Teacher PLC;8:05,8:05;Period 5;9:39,9:39;Homeroom;9:49,9:49;S.A.S.;10:56,10:56;A Lunch;11:32,11:32;Passing Period;11:37,11:37;Period 6;13:11,13:11;Passing Period;13:16,13:16;Period 7;14:50", "10:56;Passing Period;11:01,11:01;Period 6;12:35,12:35;B Lunch;13:11"],
@@ -323,10 +181,11 @@ const scheduleData = {
     5: ["7:00;Happy Friday!;7:30,7:30;Teacher Office Hours;7:45,7:45;Period 1;8:36,8:36;Passing Period;8:41,8:41;Period 2;9:32,9:32;Passing Period;9:37,9:37;Period 3;10:28,10:28;Passing Period;10:33,10:33;Period 4;11:24,11:24;A Lunch;12:02,12:02;Passing Period;12:07,12:07;Period 5;12:58,12:58;Passing Period;13:03,13:03;Period 6;13:54,13:54;Passing Period;13:59,13:59;Period 7;14:50", "11:24;Passing Period;11:29,11:29;Period 5;12:20,12:20;B Lunch;12:58"]
 };
 
+// Cache for daily schedules
 let currentSchedules = [null, null];
 let allSortedPeriods = [];
 
-// initializeSchedules() ... (no changes needed)
+// Initialize schedules and pre-calculate/sort periods
 function initializeSchedules() {
     const now = new Date();
     const dayOfWeek = now.getDay();
@@ -352,14 +211,122 @@ function initializeSchedules() {
             allSortedPeriods = Array.from(tempPeriodsMap.values()).sort((a, b) => a.startTimeMinutes - b.startTimeMinutes);
         }
     }
-    // Initial update needed *after* initializing, handled by first clock cycle now.
-    // updateScheduleDisplay(new Date()); // Pass current time for initial consistency
+    // No need for initial updateScheduleDisplay here, it happens in first clock cycle
 }
 
+// --- updateScheduleDisplay accepts timestamp ---
+function updateScheduleDisplay(now) {
+    const scheduleInfo = getCurrentScheduleInfo(now);
+    let displayInfoA = { name: "Loading...", timeRemaining: "", progress: 0, active: false };
+    let displayInfoB = { name: "", timeRemaining: "", progress: 0, active: false };
+    let showBar1 = false;
+    let showBar2 = false;
 
-// checkCommands() ... (no changes needed)
-async function checkCommands() { /* ... */ }
-// Explicitly defining the function again for clarity, assuming it exists above
+    if (scheduleInfo.inSession) {
+        if (scheduleInfo.scheduleA.inSession) {
+            displayInfoA = { ...scheduleInfo.scheduleA, active: true };
+            showBar1 = true;
+        }
+        if (scheduleInfo.needsTwoProgressBars && scheduleInfo.scheduleB.inSession) {
+             displayInfoB = { ...scheduleInfo.scheduleB, active: true };
+             showBar2 = true;
+             if (!scheduleInfo.scheduleA.inSession) {
+                displayInfoA = displayInfoB; showBar1 = true; showBar2 = false;
+             }
+        } else if (!scheduleInfo.scheduleA.inSession && scheduleInfo.scheduleB.inSession) {
+            displayInfoA = { ...scheduleInfo.scheduleB, active: true }; showBar1 = true;
+        }
+    } else if (scheduleInfo.nextPeriod.available) {
+        displayInfoA = { name: `Next: ${scheduleInfo.nextPeriod.name}`, timeRemaining: `in ${scheduleInfo.nextPeriod.timeUntilStart}`, progress: 0, active: false };
+        showBar1 = true;
+    } else {
+         displayInfoA = { name: scheduleInfo.message || "End of School Day", timeRemaining: "", progress: 0, active: false };
+         showBar1 = true;
+    }
+
+    // Update Bar 1 DOM
+    if (showBar1) {
+        elements.bar1Name.textContent = displayInfoA.name;
+        elements.bar1Remaining.textContent = displayInfoA.timeRemaining;
+        elements.bar1Progress.style.width = displayInfoA.active ? `${displayInfoA.progress}%` : '0%';
+        elements.bar1.classList.toggle('active', displayInfoA.active);
+        elements.bar1.style.display = 'flex';
+    } else { elements.bar1.style.display = 'none'; }
+
+    // Update Bar 2 DOM
+    if (showBar2) {
+        elements.bar2Name.textContent = displayInfoB.name;
+        elements.bar2Remaining.textContent = displayInfoB.timeRemaining;
+        elements.bar2Progress.style.width = `${displayInfoB.progress}%`;
+        elements.bar2.classList.add('active');
+        elements.bar2.style.display = 'flex';
+    } else { elements.bar2.style.display = 'none'; }
+}
+
+// --- getCurrentScheduleInfo accepts timestamp ---
+function getCurrentScheduleInfo(now) {
+    const dayOfWeek = now.getDay();
+    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+    if (dayOfWeek === 0 || dayOfWeek === 6) return { /* weekend object */ };
+    if (!currentSchedules[0]) return { /* no schedule object */ };
+    const scheduleAInfo = getCurrentPeriodInfo(currentSchedules[0], now);
+    const scheduleBInfo = currentSchedules[1] ? getCurrentPeriodInfo(currentSchedules[1], now) : { inSession: false };
+    const needsTwoProgressBars = scheduleBInfo.inSession;
+    const nextPeriodInfo = getNextPeriodInfo(now);
+    return {
+        inSession: scheduleAInfo.inSession || scheduleBInfo.inSession,
+        needsTwoProgressBars, scheduleA: scheduleAInfo, scheduleB: scheduleBInfo, nextPeriod: nextPeriodInfo
+    };
+}
+// Added default returns for brevity, expand if needed
+getCurrentScheduleInfo = (now) => {
+    const dayOfWeek = now.getDay();
+    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+    if (dayOfWeek === 0 || dayOfWeek === 6) return { inSession: false, message: "Weekend - No School", needsTwoProgressBars: false, scheduleA: { inSession: false }, scheduleB: { inSession: false }, nextPeriod: { available: false } };
+    if (!currentSchedules[0]) return { inSession: false, message: "No schedule available", needsTwoProgressBars: false, scheduleA: { inSession: false }, scheduleB: { inSession: false }, nextPeriod: { available: false } };
+    const scheduleAInfo = getCurrentPeriodInfo(currentSchedules[0], now);
+    const scheduleBInfo = currentSchedules[1] ? getCurrentPeriodInfo(currentSchedules[1], now) : { inSession: false };
+    const needsTwoProgressBars = scheduleBInfo.inSession;
+    const nextPeriodInfo = getNextPeriodInfo(now);
+    return { inSession: scheduleAInfo.inSession || scheduleBInfo.inSession, needsTwoProgressBars, scheduleA: scheduleAInfo, scheduleB: scheduleBInfo, nextPeriod: nextPeriodInfo };
+};
+
+
+// --- getCurrentPeriodInfo accepts timestamp ---
+function getCurrentPeriodInfo(scheduleObj, now) {
+    if (!scheduleObj?.periods) return { inSession: false };
+    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentSeconds = now.getSeconds();
+    for (const period of scheduleObj.periods) {
+        if (period.startTimeMinutes == null || period.endTimeMinutes == null) continue;
+        if (currentTimeInMinutes >= period.startTimeMinutes && currentTimeInMinutes < period.endTimeMinutes) {
+            const totalDuration = period.endTimeMinutes - period.startTimeMinutes;
+            if (totalDuration <= 0) continue;
+            const elapsed = currentTimeInMinutes - period.startTimeMinutes;
+            const remainingWithSeconds = (period.endTimeMinutes - currentTimeInMinutes) - (currentSeconds / 60);
+            const progress = ((elapsed + (currentSeconds / 60)) / totalDuration) * 100;
+            return { inSession: true, name: period.name, timeRemaining: timeUtils.formatRemaining(remainingWithSeconds), progress: Math.min(100, progress).toFixed(1) };
+        }
+    }
+    return { inSession: false };
+}
+
+// --- getNextPeriodInfo accepts timestamp ---
+function getNextPeriodInfo(now) {
+    if (allSortedPeriods.length === 0) return { available: false };
+    const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
+    const currentSeconds = now.getSeconds();
+    for (const period of allSortedPeriods) {
+        if (period.startTimeMinutes > currentTimeInMinutes) {
+            const timeUntilStartMinutes = period.startTimeMinutes - currentTimeInMinutes;
+            const timeUntilStartWithSeconds = timeUntilStartMinutes - (currentSeconds / 60);
+            return { available: true, name: period.name, timeUntilStart: timeUtils.formatRemaining(timeUntilStartWithSeconds) };
+        }
+    }
+    return { available: false };
+}
+
+// Check for admin commands (Defined ONCE here)
 async function checkCommands() {
     try {
         const devLink = "https://script.google.com/macros/s/AKfycbxZe6A-GKnGcv9efNxrMeSNvxcYC2MhOvqQkQLNpIiQOqcJCSuCTauq0k7Pwuz4OIcf/exec";
@@ -368,50 +335,51 @@ async function checkCommands() {
         const command = await response.text();
         if (command === "refresh") { location.reload(); }
         else if (command === "wipe-storage") { localStorage.clear(); location.reload(); }
-        setTimeout(checkCommands, 300000);
+        setTimeout(checkCommands, 300000); // Check again in 5 minutes
     } catch (error) {
         console.error("Command check error:", error);
-        setTimeout(checkCommands, 300000);
+        setTimeout(checkCommands, 300000); // Retry after 5 minutes
     }
 }
 
-
-// Initialization ... (no changes needed, but ensure correct timeout IDs are used)
-let midnightScheduleResetTimeoutId = null; // Ensure this ID is global/accessible if cleared in init
-let dailyScheduleResetIntervalId = null;  // Ensure this ID is global/accessible if cleared in init
+// --- Initialization ---
+// Global IDs for interval/timeout clearing
+let midnightScheduleResetTimeoutId = null;
+let dailyScheduleResetIntervalId = null;
 
 function init() {
     console.log("Initializing Dashboard...");
     cacheElements();
 
+    // Clear timers from previous runs
     if (clockTimeoutId) clearTimeout(clockTimeoutId);
-    // Make sure midnightUpdateTimeoutId is defined if clearing it (or keep it local to setupDate)
-    // if (midnightUpdateTimeoutId) clearTimeout(midnightUpdateTimeoutId);
     if (midnightScheduleResetTimeoutId) clearTimeout(midnightScheduleResetTimeoutId);
     if (dailyScheduleResetIntervalId) clearInterval(dailyScheduleResetIntervalId);
 
-    initializeSchedules();
-    setupClock();
+    initializeSchedules(); // Load schedule data first
+    setupClock(); // Starts the main clock/update cycle
     setupWeather();
-    setupDate();
-    checkCommands();
+    setupDate(); // Sets up date display and its own midnight update
+    checkCommands(); // Start checking for commands
 
+    // Setup midnight schedule reset
     const now = new Date();
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const timeUntilMidnight = tomorrow.getTime() - now.getTime();
 
-    console.log(`Scheduling next schedule reset in ${timeUntilMidnight / 1000 / 60} minutes`);
+    console.log(`Scheduling next schedule reset in ${Math.round(timeUntilMidnight / 60000)} minutes`);
     midnightScheduleResetTimeoutId = setTimeout(() => {
         console.log("Midnight: Re-initializing schedules.");
-        initializeSchedules();
+        initializeSchedules(); // Reload for the new day
+        // Setup the interval for subsequent days *after* the first midnight
         dailyScheduleResetIntervalId = setInterval(() => {
             console.log("Daily Interval: Re-initializing schedules.");
             initializeSchedules();
-        }, 24 * 60 * 60 * 1000);
+        }, 24 * 60 * 60 * 1000); // 24 hours
     }, timeUntilMidnight);
 
     console.log("Initialization Complete.");
 }
 
-// Start Everything
+// --- Start Everything ---
 document.addEventListener('DOMContentLoaded', init);
