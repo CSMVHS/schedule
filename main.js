@@ -559,3 +559,5 @@ function performance() {
     const score = calculatePerformanceScore();
     console.log("Performance Score: ", score);
 }
+
+performance();
